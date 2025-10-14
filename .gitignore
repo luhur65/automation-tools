@@ -1,0 +1,16 @@
+# https://web.transporindo.com/sys/Omset/index
+# https://web.transporindo.com/sys/piutangemkl/index
+
+# Virtual Environment
+.venv/
+venv/
+
+# ENV
+.env
+
+# Output Files
+cek_harian.xlsx
+
+# DEBUG
+script_lama.txt
+test.py
