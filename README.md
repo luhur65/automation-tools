@@ -19,10 +19,9 @@ Ikuti langkah-langkah berikut untuk menyiapkan dan menjalankan proyek ini di kom
 ### 1. Dapatkan Kode Proyek
 Buka terminal atau command prompt, lalu kloning repositori ini:
 ```bash
-git clone <URL_REPOSITORY_ANDA>
+git clone https://github.com/luhur65/automation-tools.git
 cd BOT-CEK-HARIAN
 ```
-_Ganti `<URL_REPOSITORY_ANDA>` dengan URL Git proyek Anda._
 
 ### 2. Buat dan Aktifkan Virtual Environment
 Sangat disarankan untuk menggunakan virtual environment agar dependensi proyek tidak tercampur dengan proyek lain.
