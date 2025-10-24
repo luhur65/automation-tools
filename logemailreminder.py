@@ -1,71 +1,77 @@
+import os
 import re
 from datetime import datetime
-from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright, Page
+import openpyxl
 
-CABANG = {
-    "Medan": "http://tasmdn.kozow.com:8074",
-    "Jakarta": "http://tasjkt.kozow.com:8074",
-    "Surabaya": "http://tassby.kozow.com:8074",
-    "Makassar": "http://tasmks.kozow.com:8074"
+load_dotenv()
+
+USERNAME = os.getenv("TRUCKING_USERNAME")
+PASSWORD = os.getenv("TRUCKING_PASSWORD")
+BASE_URLS = {
+    "Medan": os.getenv("URL_MEDAN"),
+    "Jakarta": os.getenv("URL_JAKT"),
+    "Surabaya": os.getenv("URL_SBY"),
+    "Makassar": os.getenv("URL_MKS"),
 }
+EXCEL_FILE = "cek_log_email_reminder.xlsx"
 
-USERNAME = "dharma"
-PASSWORD = "12345678qq"
-
-def cek_log_email(page, cabang):
-    page.goto(f"{CABANG[cabang]}/trucking/logreminderemail/index")
+def cek_log_email(page: Page, cabang: str, base_url: str) -> str:
+    # setelah login sudah, langsung ke halaman log reminder email
+    url = f"{base_url}/trucking/logreminderemail/index"
+    page.goto(url)
     page.wait_for_load_state("networkidle")
 
-    # Ambil isi tabel log email
-    html = page.inner_html("#gview_jqGrid")
-    today = datetime.now().strftime("%d-%m-%Y")
-
-    # Cari tanggal hari ini di grid
-    pattern = rf"{today}\s+\d{{2}}:\d{{2}}:\d{{2}}"  # contoh: 24-10-2025 08:45:22
-    match = re.search(pattern, html)
-
+    html = page.inner_html("#gview_jqGrid")  # asumsi grid punya id ini
+    today_str = datetime.now().strftime("%d-%m-%Y")
+    # Cari tanggal hari ini + waktu
+    match = re.search(rf"{today_str}\s+\d{{2}}:\d{{2}}:\d{{2}}", html)
     if match:
         return match.group(0)
-    else:
-        return None
+    return "-"
 
-
-def login(page, base_url):
+def login(page: Page, base_url: str):
     page.goto(f"{base_url}/trucking/login")
     page.get_by_role("textbox", name="User ID").fill(USERNAME)
     page.get_by_role("textbox", name="Password").fill(PASSWORD)
     page.get_by_role("button", name="Sign In").click()
     page.wait_for_load_state("networkidle")
 
-
 def run():
-    hasil = {}
-
+    today = datetime.now().strftime("%d-%m-%Y")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        for cabang, base_url in CABANG.items():
+        results = {}
+        for cabang, base_url in BASE_URLS.items():
             context = browser.new_context()
             page = context.new_page()
-
-            print(f"🔍 Mengecek log email cabang {cabang} ...")
             try:
                 login(page, base_url)
-                waktu = cek_log_email(page, cabang)
-                hasil[cabang] = waktu if waktu else "-"
+                waktu = cek_log_email(page, cabang, base_url)
+                results[cabang] = waktu
             except Exception as e:
-                hasil[cabang] = f"❌ Error: {e}"
+                results[cabang] = f"Error: {e}"
             finally:
                 context.close()
-
         browser.close()
 
-    print("\n=== HASIL CEK LOG EMAIL REMINDER ===")
-    for cabang, waktu in hasil.items():
-        if waktu and waktu != "-":
-            print(f"✅ {cabang}: Email terkirim pada {waktu}")
-        else:
-            print(f"⚠️ {cabang}: Tidak ada log pengiriman hari ini")
+    # === Tulis ke Excel ===
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+    except FileNotFoundError:
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
 
+    ws = wb.create_sheet(title=today)
+    ws.append(["Cabang", "Waktu Pengiriman Email Reminder"])
+
+    for i, (cabang, waktu) in enumerate(results.items(), start=2):
+        ws[f"A{i}"] = cabang
+        ws[f"B{i}"] = f"Tanggal Kirim : {waktu}"
+
+    wb.save(EXCEL_FILE)
+    print(f"✅ Hasil cek log email reminder berhasil disimpan di {EXCEL_FILE}")
 
 if __name__ == "__main__":
     run()
